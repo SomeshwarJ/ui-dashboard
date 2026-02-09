@@ -19,7 +19,8 @@ import {
     Sliders,
     Paperclip,
     FlaskConical,
-    Clock // Added for experiment selector
+    Clock,
+    X
 } from 'lucide-react';
 import ModelConfigPanel from './ModelConfigPanel';
 
@@ -28,12 +29,6 @@ const MODELS = [
     { id: 'gpt-4o', name: 'GPT-4o', type: 'General', context: '128k', speed: 'Fast' },
     { id: 'claude-3-5-sonnet', name: 'Claude 3.5 Sonnet', type: 'Reasoning', context: '200k', speed: 'Med' },
     { id: 'llama-3-70b', name: 'Llama 3 (70B)', type: 'Open Source', context: '8k', speed: 'Ultra Fast' },
-];
-
-const INITIAL_MCP_TOOLS = [
-    { id: 'github', name: 'GitHub Copilot', icon: Terminal, active: false },
-    { id: 'web', name: 'Web Search', icon: Globe, active: false },
-    { id: 'fs', name: 'FileSystem', icon: Database, active: false },
 ];
 
 const ChatArea = ({
@@ -54,13 +49,14 @@ const ChatArea = ({
     experiments,
     activeExperimentId,
     onSelectExperiment,
-    onNewExperiment
+    onNewExperiment,
+    // MCP Tools (Lifted State)
+    customTools = [],
+    onAddTool
 }) => {
     const [input, setInput] = useState('');
-    const [toolDropdownOpen, setToolDropdownOpen] = useState(false);
-    const [customTools, setCustomTools] = useState(INITIAL_MCP_TOOLS);
-    const [newToolName, setNewToolName] = useState('');
     const [isConfigOpen, setIsConfigOpen] = useState(false);
+    const [isToolSelectorOpen, setIsToolSelectorOpen] = useState(false);
 
     const bottomRef = useRef(null);
 
@@ -79,19 +75,6 @@ const ChatArea = ({
             e.preventDefault();
             handleSend();
         }
-    };
-
-    const handleAddTool = () => {
-        if (!newToolName.trim()) return;
-        const newTool = {
-            id: newToolName.toLowerCase().replace(/\s+/g, '-'),
-            name: newToolName,
-            icon: Zap,
-            active: true
-        };
-        setCustomTools(prev => [...prev, newTool]);
-        onToggleTool(newTool.id);
-        setNewToolName('');
     };
 
     // --- Components ---
@@ -253,8 +236,8 @@ const ChatArea = ({
                                     </div>
                                 )}
                                 <div className={`max-w-[80%] p-4 rounded-2xl text-sm leading-relaxed ${msg.role === 'user'
-                                        ? 'bg-white/5 text-white rounded-tr-sm'
-                                        : 'bg-transparent border border-white/5 text-gemini-100 rounded-tl-sm'
+                                    ? 'bg-white/5 text-white rounded-tr-sm'
+                                    : 'bg-transparent border border-white/5 text-gemini-100 rounded-tl-sm'
                                     }`}>
                                     <div className="whitespace-pre-wrap">{msg.content}</div>
                                     {msg.meta && <div className="mt-2 pt-2 border-t border-white/5 text-[10px] text-gemini-500 flex gap-2">
@@ -271,93 +254,107 @@ const ChatArea = ({
 
             {/* Input Area */}
             <div className="p-6 pt-2">
-                <div className="bg-gemini-900/50 border border-white/10 rounded-2xl shadow-lg focus-within:ring-1 focus-within:ring-accent-primary/50 transition-all z-30">
-                    {/* Tools & Attachments Bar */}
-                    <div className="px-3 pt-2 flex items-center gap-2 border-b border-white/5 pb-2 mb-1">
-                        <button
-                            onClick={onUploadClick}
-                            className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-white/5 text-xs text-gemini-400 hover:text-white transition-colors"
-                        >
-                            <Upload size={14} />
-                            <span className="hidden sm:inline">Upload Context</span>
-                        </button>
-                        <div className="h-4 w-px bg-white/10 mx-1"></div>
-
-                        {/* Active Tools List */}
-                        <div className="flex items-center gap-1">
-                            {customTools.map(tool => (
-                                <button
-                                    key={tool.id}
-                                    onClick={() => onToggleTool(tool.id)}
-                                    className={`p-1.5 rounded-md transition-all flex items-center gap-1.5 ${activeTools.includes(tool.id)
-                                            ? 'bg-accent-primary/20 text-accent-primary'
-                                            : 'text-gemini-600 hover:bg-white/5 hover:text-white'
-                                        }`}
-                                    title={tool.name}
-                                >
-                                    <tool.icon size={14} />
-                                    {activeTools.includes(tool.id) && <span className="text-[10px] font-medium">{tool.name}</span>}
-                                </button>
+                <div className="bg-gemini-900/50 border border-white/10 rounded-2xl shadow-lg focus-within:ring-1 focus-within:ring-accent-primary/50 transition-all z-30 relative group">
+                    {/* Active Tools Chips (In-Input) */}
+                    {activeTools.length > 0 && (
+                        <div className="px-3 pt-3 flex flex-wrap gap-2">
+                            {customTools.filter(t => activeTools.includes(t.id)).map(tool => (
+                                <div key={tool.id} className="flex items-center gap-1.5 pl-2 pr-1 py-0.5 rounded-full bg-accent-primary/10 border border-accent-primary/20 text-accent-primary text-[10px] font-medium animate-in zoom-in-50 duration-200">
+                                    <tool.icon size={10} />
+                                    {tool.name}
+                                    <button
+                                        onClick={() => onToggleTool(tool.id)}
+                                        className="p-0.5 hover:bg-accent-primary/20 rounded-full transition-colors"
+                                    >
+                                        <X size={10} />
+                                    </button>
+                                </div>
                             ))}
-
-                            {/* Add New Tool Popover */}
-                            <div className="relative ml-2">
-                                <button
-                                    onClick={() => setToolDropdownOpen(!toolDropdownOpen)}
-                                    className="p-1 rounded bg-white/5 hover:bg-white/10 text-gemini-500 hover:text-white transition-colors"
-                                >
-                                    <Plus size={12} />
-                                </button>
-
-                                {toolDropdownOpen && (
-                                    <div className="absolute bottom-full mb-2 left-0 w-48 bg-gemini-900 border border-white/10 rounded-lg shadow-xl p-2 z-50">
-                                        <div className="text-[10px] uppercase font-bold text-gemini-600 mb-2">Add Custom Tool</div>
-                                        <div className="flex gap-1">
-                                            <input
-                                                type="text"
-                                                placeholder="Tool Name..."
-                                                className="flex-1 bg-gemini-950 border border-white/10 rounded text-xs px-2 py-1 text-white focus:outline-none"
-                                                value={newToolName}
-                                                onChange={(e) => setNewToolName(e.target.value)}
-                                            />
-                                            <button
-                                                onClick={handleAddTool}
-                                                className="p-1 bg-accent-primary text-black rounded hover:bg-accent-primary/90"
-                                            >
-                                                <Plus size={12} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
                         </div>
-                    </div>
+                    )}
 
                     <textarea
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder={`Experimenting with ${MODELS.find(m => m.id === activeModel)?.name}...`}
-                        className="w-full bg-transparent border-none text-white px-4 py-2 min-h-[50px] max-h-[200px] resize-none focus:ring-0 placeholder:text-gemini-600 text-sm leading-relaxed custom-scrollbar"
+                        placeholder={`Ask anything using ${MODELS.find(m => m.id === activeModel)?.name}...`}
+                        className="w-full bg-transparent border-none text-white px-4 py-3 min-h-[50px] max-h-[200px] resize-none focus:ring-0 placeholder:text-gemini-600 text-sm leading-relaxed custom-scrollbar"
                     />
 
-                    <div className="px-3 pb-3 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
+                    {/* Bottom Toolbar */}
+                    <div className="px-3 pb-3 flex items-center justify-between border-t border-white/5 pt-2 mt-1">
+                        <div className="flex items-center gap-1">
+                            {/* Tool Selector Trigger */}
+                            <div className="relative">
+                                <button
+                                    onClick={() => setIsToolSelectorOpen(!isToolSelectorOpen)}
+                                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-all text-xs font-medium border ${activeTools.length > 0
+                                        ? 'bg-accent-primary/10 border-accent-primary/20 text-accent-primary'
+                                        : 'bg-white/5 border-transparent text-gemini-500 hover:text-white hover:bg-white/10'
+                                        }`}
+                                >
+                                    <Zap size={14} className={activeTools.length > 0 ? "fill-current" : ""} />
+                                    <span>Tools</span>
+                                    {activeTools.length > 0 && <span className="bg-accent-primary/20 text-accent-primary px-1 rounded-sm text-[9px]">{activeTools.length}</span>}
+                                </button>
+
+                                {/* Tool Selection Popover */}
+                                {isToolSelectorOpen && (
+                                    <div className="absolute bottom-full mb-2 left-0 w-64 bg-gemini-900 border border-white/10 rounded-xl shadow-2xl p-2 z-50 animate-in slide-in-from-bottom-2 fade-in duration-200">
+                                        <div className="text-[10px] font-semibold text-gemini-500 uppercase tracking-wider px-2 py-1 mb-1">Select MCP Tools</div>
+                                        <div className="space-y-1">
+                                            {customTools.map(tool => (
+                                                <button
+                                                    key={tool.id}
+                                                    onClick={() => onToggleTool(tool.id)}
+                                                    className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm transition-colors ${activeTools.includes(tool.id)
+                                                        ? 'bg-accent-primary/15 text-white'
+                                                        : 'text-gemini-400 hover:bg-white/5 hover:text-white'
+                                                        }`}
+                                                >
+                                                    <div className={`p-1.5 rounded-md ${activeTools.includes(tool.id) ? 'bg-accent-primary text-black' : 'bg-white/5 text-gemini-500'}`}>
+                                                        <tool.icon size={12} />
+                                                    </div>
+                                                    <span className="flex-1 text-left">{tool.name}</span>
+                                                    {activeTools.includes(tool.id) && <Check size={12} className="text-accent-primary" />}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div className="mt-2 pt-2 border-t border-white/5">
+                                            <button
+                                                onClick={onOpenPromptLibrary} // Redirect to Manage Tools
+                                                className="w-full py-1.5 text-xs text-gemini-500 hover:text-white flex items-center justify-center gap-1 hover:bg-white/5 rounded-lg transition-colors"
+                                            >
+                                                <Settings size={12} /> Manage Tools
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <button
+                                onClick={onUploadClick}
+                                className="p-2 rounded-lg hover:bg-white/5 text-gemini-500 hover:text-white transition-colors"
+                                title="Upload Context"
+                            >
+                                <Paperclip size={16} />
+                            </button>
+
                             <button
                                 onClick={onOpenPromptLibrary}
                                 className="p-2 rounded-lg hover:bg-white/5 text-gemini-500 hover:text-white transition-colors"
-                                title="Open Prompt Library"
+                                title="Prompt Library"
                             >
                                 <Database size={16} />
                             </button>
                         </div>
 
-                        <div className="flex items-center gap-4">
-                            <span className="text-[10px] text-gemini-600 font-mono">{input.length} chars</span>
+                        <div className="flex items-center gap-3">
+                            <span className="text-[10px] text-gemini-600 font-mono hidden sm:inline-block">{input.length} chars</span>
                             <button
                                 onClick={handleSend}
                                 disabled={!input.trim()}
-                                className="w-8 h-8 rounded-lg bg-white text-black flex items-center justify-center hover:bg-gemini-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg shadow-white/10"
+                                className="w-8 h-8 rounded-lg bg-accent-primary text-black flex items-center justify-center hover:bg-accent-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 shadow-lg shadow-accent-primary/20"
                             >
                                 <Send size={14} className="ml-0.5" />
                             </button>
@@ -365,6 +362,14 @@ const ChatArea = ({
                     </div>
                 </div>
             </div>
+
+            {/* Backdrop for popovers */}
+            {isToolSelectorOpen && (
+                <div
+                    className="fixed inset-0 z-20"
+                    onClick={() => setIsToolSelectorOpen(false)}
+                />
+            )}
         </div>
     );
 };

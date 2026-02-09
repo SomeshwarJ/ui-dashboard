@@ -4,6 +4,7 @@ import ChatArea from '../components/playground/ChatArea';
 import FileSidebar from '../components/playground/FileSidebar';
 import PromptLibrary from '../components/playground/PromptLibrary';
 import ModelComparisonModal from '../components/playground/ModelComparisonModal';
+import { Terminal, Globe, Database, Zap } from 'lucide-react';
 
 // Mock Data Generators
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -11,6 +12,12 @@ const generateId = () => Math.random().toString(36).substr(2, 9);
 const INITIAL_PROMPTS = [
     { id: '1', title: 'React Expert', tag: 'Dev', desc: 'Act as a Senior React Engineer. Focus on performance patterns.' },
     { id: '2', title: 'Legal Auditor', tag: 'Legal', desc: 'Analyze the uploaded contract for loopholes and risk factors.' },
+];
+
+const INITIAL_MCP_TOOLS = [
+    { id: 'github', name: 'GitHub Copilot', icon: Terminal, active: false },
+    { id: 'web', name: 'Web Search', icon: Globe, active: false },
+    { id: 'fs', name: 'FileSystem', icon: Database, active: false },
 ];
 
 const INITIAL_EXPERIMENTS = [
@@ -47,6 +54,7 @@ const Playground = ({ onNavigate }) => {
     const [prompts, setPrompts] = useState(INITIAL_PROMPTS);
     const [activeModel, setActiveModel] = useState('gemini-1.5-pro');
     const [activeTools, setActiveTools] = useState([]);
+    const [customTools, setCustomTools] = useState(INITIAL_MCP_TOOLS);
 
     // UI State
     const [isPromptLibraryOpen, setIsPromptLibraryOpen] = useState(false);
@@ -58,6 +66,19 @@ const Playground = ({ onNavigate }) => {
         setExperiments(prev => prev.map(exp =>
             exp.id === activeExperimentId ? { ...exp, ...updates } : exp
         ));
+    };
+
+    const handleAddTool = (newToolName) => {
+        if (!newToolName.trim()) return;
+        const newTool = {
+            id: newToolName.toLowerCase().replace(/\s+/g, '-'),
+            name: newToolName,
+            icon: Zap,
+            active: true
+        };
+        setCustomTools(prev => [...prev, newTool]);
+        // Also enable it by default
+        setActiveTools(prev => [...prev, newTool.id]);
     };
 
     // File Handlers
@@ -179,7 +200,10 @@ const Playground = ({ onNavigate }) => {
                         onConfigChange={handleConfigChange}
                         onSendMessage={handleSendMessage}
                         onSaveConversation={handleSaveExperiment}
+
                         activeTools={activeTools}
+                        customTools={customTools} // Pass lifted state
+                        onAddTool={handleAddTool} // Pass handler
                         onToggleTool={(id) => setActiveTools(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id])}
                         onOpenPromptLibrary={() => setIsPromptLibraryOpen(true)}
                         onOpenComparison={() => setIsComparisonOpen(true)}
@@ -193,13 +217,18 @@ const Playground = ({ onNavigate }) => {
                         onNewExperiment={handleNewExperiment}
                     />
 
-                    {/* 3. Prompt Library */}
+                    {/* 3. Prompt Library (and MCP Tools) */}
                     <PromptLibrary
                         prompts={prompts}
                         onCreatePrompt={(p) => setPrompts(prev => [...prev, { id: generateId(), ...p }])}
                         onSelectPrompt={(p) => setIsPromptLibraryOpen(false)}
                         isOpen={isPromptLibraryOpen}
                         onToggle={() => setIsPromptLibraryOpen(!isPromptLibraryOpen)}
+                        // MCP Tool Props
+                        availableTools={customTools}
+                        activeTools={activeTools}
+                        onToggleTool={(id) => setActiveTools(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id])}
+                        onAddTool={handleAddTool}
                     />
                 </div>
             </div>
